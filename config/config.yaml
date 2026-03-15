@@ -1,0 +1,86 @@
+# ============================================================
+# 燃煤锅炉运行参数安全离线优化系统 - 全局配置
+# ============================================================
+
+# ---- 数据生成 -----------------------------------------------
+data:
+  n_samples: 50000          # 离线数据集总样本数
+  episode_length: 200       # 每个 episode 步数
+  noise_std: 0.02           # 观测噪声标准差
+  random_seed: 42
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+  save_dir: "dataset"
+
+# ---- 锅炉物理参数 -------------------------------------------
+boiler:
+  # 状态维度说明:
+  # 0: 炉膛温度      (°C)   [900, 1200]
+  # 1: 蒸汽压力      (MPa)  [8,   14 ]
+  # 2: 蒸汽温度      (°C)   [500, 560]
+  # 3: 氧含量        (%)    [2,   6  ]
+  # 4: 排烟温度      (°C)   [120, 200]
+  # 5: 给煤量        (t/h)  [20,  40 ]
+  # 6: 送风量        (m³/h) [200, 400]
+  # 7: NOx 排放      (mg/m³)[100, 400]
+  state_dim: 8
+  # 动作维度说明:
+  # 0: 给煤量增量    (归一化 [-1, 1] → 实际 ±2 t/h)
+  # 1: 送风量增量    (归一化 [-1, 1] → 实际 ±20 m³/h)
+  action_dim: 2
+  action_scale: [2.0, 20.0]  # 动作放大倍数
+
+# ---- 安全约束 -----------------------------------------------
+safety:
+  state_min: [900,  8.0, 500,  2.0, 120, 20,  200, 100]
+  state_max: [1200, 14.0, 560, 6.0, 200, 40,  400, 400]
+  # 报警阈值 (比安全边界更严)
+  alarm_min: [920,  8.5, 505,  2.5, 125, 22,  220, 120]
+  alarm_max: [1180, 13.5, 555, 5.5, 190, 38,  380, 380]
+  # 约束惩罚系数
+  violation_penalty: 10.0
+
+# ---- 数字孪生 (LSTM) ----------------------------------------
+digital_twin:
+  hidden_size: 128
+  num_layers: 2
+  seq_len: 10               # 历史窗口长度
+  dropout: 0.1
+  learning_rate: 1.0e-3
+  batch_size: 256
+  max_epochs: 100
+  patience: 15              # 早停耐心值
+  grad_clip: 1.0
+  save_path: "checkpoints/digital_twin.pt"
+
+# ---- 安全离线强化学习 (CQL) ---------------------------------
+offline_rl:
+  # 网络结构
+  hidden_sizes: [256, 256]
+  # 训练超参数
+  learning_rate: 3.0e-4
+  batch_size: 256
+  gamma: 0.99               # 折扣因子
+  tau: 0.005                # 目标网络软更新系数
+  # CQL 特有参数
+  cql_alpha: 1.0            # 保守正则化系数
+  cql_n_actions: 10         # 随机动作采样数量
+  # 安全层
+  use_safety_layer: true
+  safety_penalty_coef: 5.0
+  # 训练过程
+  max_steps: 100000
+  eval_interval: 5000
+  save_interval: 10000
+  warmup_steps: 1000
+  save_path: "checkpoints/cql_agent"
+  # 行为策略混合率 (0=纯 CQL, 1=纯行为策略)
+  behavior_mix: 0.0
+
+# ---- 评估 ---------------------------------------------------
+evaluation:
+  n_episodes: 50
+  episode_length: 200
+  render: false
+  results_dir: "results"
